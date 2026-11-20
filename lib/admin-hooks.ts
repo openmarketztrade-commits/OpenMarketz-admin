@@ -4,10 +4,13 @@ import { useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import {
+  listAdminProducts,
+  listAdminSessions,
   getOrder,
   getSupportTicket,
   listAdminOrders,
   listAdminSupportTickets,
+  listAdminUsers,
   listSellerApplications,
 } from "@/lib/api"
 
@@ -16,6 +19,9 @@ export const adminKeys = {
   supportTickets: "admin/support-tickets",
   supportTicket: (id: string) => ["admin/support-ticket", id] as const,
   orders: "admin/orders",
+  users: "admin/users",
+  products: "admin/products",
+  sessions: "admin/sessions",
   order: (id: string) => ["admin/order", id] as const,
 }
 
@@ -33,6 +39,18 @@ export function useSupportTicket(id: string | null) {
 
 export function useAdminOrders() {
   return useSWR(adminKeys.orders, listAdminOrders)
+}
+
+export function useAdminUsers() {
+  return useSWR(adminKeys.users, listAdminUsers)
+}
+
+export function useAdminProducts() {
+  return useSWR(adminKeys.products, listAdminProducts)
+}
+
+export function useAdminSessions() {
+  return useSWR(adminKeys.sessions, listAdminSessions)
 }
 
 export function useOrder(id: string | null) {

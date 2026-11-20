@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react"
 import useSWR from "swr"
 import type { AuthUser } from "@/lib/admin-types"
-import { getCurrentUser, login, logout } from "@/lib/api"
+import { ApiError, getCurrentUser, login, logout, setAccessToken } from "@/lib/api"
 import { disconnectRealtime } from "@/lib/realtime"
 
 interface AuthContextValue {
@@ -25,8 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      await login(email, password)
-      return (await mutate()) ?? null
+      const authenticatedUser = await login(email, password)
+      if (!authenticatedUser || authenticatedUser.role !== "ADMIN") {
+        try {
+          await logout()
+        } finally {
+          setAccessToken(null)
+          await mutate(null, { revalidate: false })
+        }
+        throw new ApiError("This account does not have administrator access.", 403)
+      }
+      await mutate(authenticatedUser, { revalidate: false })
+      return authenticatedUser
     },
     [mutate],
   )
@@ -35,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await logout()
     } finally {
+      setAccessToken(null)
       disconnectRealtime()
       await mutate(null, { revalidate: false })
     }

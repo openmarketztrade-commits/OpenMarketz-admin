@@ -10,6 +10,39 @@ export interface AuthUser {
   role: UserRole
 }
 
+export interface AdminAccount {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  role: UserRole
+  status: string
+  createdAt: string
+  seller?: { storeName?: string | null; applicationStatus?: string | null } | null
+}
+
+export interface AdminProduct {
+  id: string
+  slug: string
+  name: string
+  brand?: string | null
+  status: string
+  price: number
+  stock: number
+  createdAt: string
+  category?: { name?: string | null; slug?: string | null } | null
+  seller?: StoreRef | null
+}
+
+export interface AuthSession {
+  id: string
+  userAgent?: string | null
+  ipAddress?: string | null
+  createdAt: string
+  lastUsedAt?: string | null
+  expiresAt: string
+}
+
 export interface PersonRef {
   id?: string
   name?: string | null

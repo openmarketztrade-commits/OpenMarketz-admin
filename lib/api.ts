@@ -1,5 +1,8 @@
 import type {
   AuthUser,
+  AdminAccount,
+  AdminProduct,
+  AuthSession,
   MediaAccess,
   Order,
   SellerApplication,
@@ -9,6 +12,13 @@ import type {
 } from "@/lib/admin-types"
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "")
+
+let accessToken: string | null = null
+let refreshInFlight: Promise<string | null> | null = null
+
+export function setAccessToken(token: string | null) {
+  accessToken = token
+}
 
 export class ApiError extends Error {
   status: number
@@ -22,7 +32,7 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown }
+type RequestOptions = Omit<RequestInit, "body"> & { body?: unknown; skipAuthRefresh?: boolean }
 
 function extractMessage(payload: unknown): string | null {
   if (!payload) return null
@@ -64,8 +74,12 @@ function unwrap(payload: unknown) {
   return payload
 }
 
-export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, headers, ...init } = options
+export async function apiRequest<T = unknown>(
+  path: string,
+  options: RequestOptions = {},
+  retryAfterRefresh = true,
+): Promise<T> {
+  const { body, headers, skipAuthRefresh, ...init } = options
   let response: Response
 
   try {
@@ -75,6 +89,7 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
       headers: {
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -94,10 +109,46 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
   }
 
   if (!response.ok) {
-    throw new ApiError(extractMessage(payload) ?? defaultMessage(response.status), response.status, payload)
+    const error = new ApiError(extractMessage(payload) ?? defaultMessage(response.status), response.status, payload)
+    if (
+      response.status === 401 &&
+      retryAfterRefresh &&
+      !skipAuthRefresh &&
+      path !== "/api/v1/auth/login" &&
+      path !== "/api/v1/auth/refresh"
+    ) {
+      const token = await refreshAccessToken()
+      if (token) return apiRequest<T>(path, options, false)
+    }
+    throw error
   }
 
   return unwrap(payload) as T
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    try {
+      const payload = await apiRequest<{ accessToken?: string }>("/api/v1/auth/refresh", {
+        method: "POST",
+        skipAuthRefresh: true,
+      }, false)
+      const token = payload?.accessToken
+      if (typeof token !== "string" || !token) {
+        throw new ApiError("The server did not return an access token.", 502, payload)
+      }
+      setAccessToken(token)
+      return token
+    } catch (error) {
+      setAccessToken(null)
+      if (error instanceof ApiError && error.status === 401) return null
+      throw error
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
 }
 
 export function getErrorMessage(error: unknown, fallback = "Something went wrong.") {
@@ -128,6 +179,7 @@ function toEntity<T>(payload: unknown, key: string): T {
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
+    if (!accessToken && !(await refreshAccessToken())) return null
     const payload = await apiRequest("/api/v1/auth/me")
     return toEntity<AuthUser | null>(payload, "user")
   } catch (error) {
@@ -137,12 +189,70 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 export async function login(email: string, password: string) {
-  const payload = await apiRequest("/api/v1/auth/login", { method: "POST", body: { email, password } })
+  const payload = await apiRequest<{ accessToken?: string; user?: AuthUser | null }>(
+    "/api/v1/auth/login",
+    { method: "POST", body: { email, password }, skipAuthRefresh: true },
+    false,
+  )
+  if (typeof payload?.accessToken !== "string" || !payload.accessToken) {
+    throw new ApiError("The server did not return an access token.", 502, payload)
+  }
+  setAccessToken(payload.accessToken)
   return toEntity<AuthUser | null>(payload, "user")
 }
 
 export async function logout() {
   await apiRequest("/api/v1/auth/logout", { method: "POST" })
+}
+
+export function requestPasswordReset(email: string) {
+  return apiRequest("/api/v1/auth/forgot-password", { method: "POST", body: { email: email.trim() } })
+}
+
+export function resetPassword(email: string, code: string, newPassword: string) {
+  return apiRequest("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: { email: email.trim(), code: code.trim(), newPassword },
+  })
+}
+
+export async function listAdminSessions() {
+  const payload = await apiRequest("/api/v1/auth/sessions")
+  return toList<AuthSession>(payload, ["sessions", "items", "results"])
+}
+
+export function revokeOtherSessions() {
+  return apiRequest("/api/v1/auth/sessions/revoke-others", { method: "POST" })
+}
+
+/* Admin account and product management */
+
+export async function listAdminUsers() {
+  const payload = await apiRequest("/api/v1/admin/users")
+  return toList<AdminAccount>(payload, ["users", "items", "results"])
+}
+
+export function inviteAdminAccount(input: { email: string; firstName: string; lastName: string }) {
+  return apiRequest("/api/v1/admin/users/admins", { method: "POST", body: input })
+}
+
+export function updateAdminUserStatus(id: string, status: "ACTIVE" | "SUSPENDED") {
+  return apiRequest(`/api/v1/admin/users/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: { status },
+  })
+}
+
+export async function listAdminProducts() {
+  const payload = await apiRequest("/api/v1/admin/products")
+  return toList<AdminProduct>(payload, ["products", "items", "results"])
+}
+
+export function updateAdminProductStatus(id: string, status: "ACTIVE" | "PAUSED" | "ARCHIVED") {
+  return apiRequest(`/api/v1/admin/products/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: { status },
+  })
 }
 
 /* Seller applications */
