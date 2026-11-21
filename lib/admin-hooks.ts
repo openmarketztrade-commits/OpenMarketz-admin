@@ -41,12 +41,12 @@ export function useAdminOrders() {
   return useSWR(adminKeys.orders, listAdminOrders)
 }
 
-export function useAdminUsers() {
-  return useSWR(adminKeys.users, listAdminUsers)
+export function useAdminUsers(params: { q?: string; page?: number; pageSize?: number; status?: string; role?: string } = {}) {
+  return useSWR([adminKeys.users, params], ([, options]) => listAdminUsers(options))
 }
 
-export function useAdminProducts() {
-  return useSWR(adminKeys.products, listAdminProducts)
+export function useAdminProducts(params: { q?: string; page?: number; pageSize?: number; status?: string } = {}) {
+  return useSWR([adminKeys.products, params], ([, options]) => listAdminProducts(options))
 }
 
 export function useAdminSessions() {

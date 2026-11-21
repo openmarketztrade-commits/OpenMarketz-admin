@@ -3,6 +3,7 @@ import {
   LifeBuoyIcon,
   PackageIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   ShoppingCartIcon,
   StoreIcon,
   UsersIcon,
@@ -38,6 +39,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: "Catalog & people",
     items: [
       { href: "/admin/users", label: "Users", icon: UsersIcon },
+      { href: "/admin/admins", label: "Administrators", icon: ShieldCheckIcon },
       { href: "/admin/products", label: "Products", icon: PackageIcon },
     ],
   },

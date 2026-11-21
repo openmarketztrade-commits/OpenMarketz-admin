@@ -18,7 +18,10 @@ export interface AdminAccount {
   role: UserRole
   status: string
   createdAt: string
-  seller?: { storeName?: string | null; applicationStatus?: string | null } | null
+  emailVerifiedAt?: string | null
+  updatedAt?: string
+  store?: { id: string; name: string; slug?: string; active?: boolean; verified?: boolean } | null
+  sellerApplication?: { id: string; status: string; submittedAt?: string | null } | null
 }
 
 export interface AdminProduct {
@@ -41,6 +44,25 @@ export interface AuthSession {
   createdAt: string
   lastUsedAt?: string | null
   expiresAt: string
+  revokedAt?: string | null
+}
+
+export interface PaginatedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface AdminAuditEvent {
+  id: string
+  actorId?: string | null
+  action: string
+  targetType: string
+  targetId?: string | null
+  metadata?: Record<string, unknown>
+  createdAt: string
+  actor?: PersonRef | null
 }
 
 export interface PersonRef {

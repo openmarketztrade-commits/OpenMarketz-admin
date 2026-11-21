@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { useAuth } from "@/components/auth-provider"
 import { connectRealtime, getRealtimeUrl } from "@/lib/realtime"
 
 export type NotificationKind = "support" | "order" | "seller" | "system"
@@ -50,13 +51,22 @@ function normalizeKind(value?: string): NotificationKind {
 }
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
-  const [status, setStatus] = useState<RealtimeStatus>(() => (getRealtimeUrl() ? "connecting" : "unconfigured"))
+  const [status, setStatus] = useState<RealtimeStatus>("unconfigured")
   const [panelOpen, setPanelOpen] = useState(false)
 
   useEffect(() => {
+    if (!user || !getRealtimeUrl()) {
+      setStatus("unconfigured")
+      return
+    }
+    setStatus("connecting")
     const socket = connectRealtime()
-    if (!socket) return
+    if (!socket) {
+      setStatus("unconfigured")
+      return
+    }
 
     const handleConnect = () => setStatus("connected")
     const handleDisconnect = () => setStatus("disconnected")
@@ -87,7 +97,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       socket.off("connect_error", handleDisconnect)
       socket.off("notification", handleNotification)
     }
-  }, [])
+  }, [user?.id])
 
   const markRead = useCallback((id: string) => {
     setNotifications((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)))

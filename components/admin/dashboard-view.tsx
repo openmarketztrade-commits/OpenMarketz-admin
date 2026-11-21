@@ -8,22 +8,16 @@ import {
   PackageIcon,
   ShoppingCartIcon,
   StoreIcon,
-  TruckIcon,
   UsersIcon,
 } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { useAdminOrders, useAdminSupportTickets, useSellerApplications } from "@/lib/admin-hooks"
+import { useAdminProducts, useAdminSupportTickets, useAdminUsers, useSellerApplications } from "@/lib/admin-hooks"
 import {
   display,
   formatDate,
-  humanize,
   isAwaitingReview,
-  orderNeedsAttention,
-  orderNumber,
   personName,
   storeHandle,
   submittedAt,
@@ -40,7 +34,6 @@ import { AdminStatCard } from "./admin-stat-card"
 import { AdminStatusBadge } from "./admin-status-badge"
 
 const OPEN_TICKET_STATUSES = new Set(["OPEN", "IN_PROGRESS", "WAITING_FOR_CUSTOMER"])
-const chartConfig = { count: { label: "Orders", color: "var(--chart-1)" } } satisfies ChartConfig
 
 function ActivityCard({
   title,
@@ -91,7 +84,8 @@ export function DashboardView() {
   const { user } = useAuth()
   const sellers = useSellerApplications()
   const tickets = useAdminSupportTickets()
-  const orders = useAdminOrders()
+  const users = useAdminUsers({ pageSize: 1 })
+  const products = useAdminProducts({ pageSize: 1 })
 
   const pendingSellers = useMemo(
     () =>
@@ -107,16 +101,6 @@ export function DashboardView() {
         .sort((a, b) => timestamp(b.updatedAt ?? b.createdAt) - timestamp(a.updatedAt ?? a.createdAt)),
     [tickets.data],
   )
-  const attentionOrders = useMemo(() => (orders.data ?? []).filter(orderNeedsAttention), [orders.data])
-  const recentOrders = useMemo(
-    () => [...(orders.data ?? [])].sort((a, b) => timestamp(b.createdAt) - timestamp(a.createdAt)).slice(0, 5),
-    [orders.data],
-  )
-  const statusChart = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const order of orders.data ?? []) counts.set(order.status, (counts.get(order.status) ?? 0) + 1)
-    return Array.from(counts, ([status, count]) => ({ status: humanize(status), count }))
-  }, [orders.data])
 
   const firstName = user?.firstName || personName(user)?.split(" ")[0]
 
@@ -124,7 +108,7 @@ export function DashboardView() {
     <>
       <AdminPageHeader
         title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
-        description="A live view of the work waiting for you across OpenMarketz."
+        description="A live view of seller applications and support tickets from the OpenMarketz API."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -146,29 +130,9 @@ export function DashboardView() {
           hint={tickets.data ? `${tickets.data.length} tickets in total` : undefined}
           href="/admin/support"
         />
-        <AdminStatCard
-          label="Orders needing delivery review"
-          icon={TruckIcon}
-          value={orders.data ? attentionOrders.length : null}
-          loading={orders.isLoading}
-          errorMessage={orders.error ? getErrorMessage(orders.error) : undefined}
-          hint={orders.data ? "Shipped, or delivered without admin confirmation" : undefined}
-          href="/admin/orders"
-        />
-        <AdminStatCard
-          label="Total orders"
-          icon={ShoppingCartIcon}
-          value={orders.data ? orders.data.length : null}
-          loading={orders.isLoading}
-          errorMessage={orders.error ? getErrorMessage(orders.error) : undefined}
-          href="/admin/orders"
-        />
-        <AdminStatCard label="Users" icon={UsersIcon} unavailableMessage="Data unavailable until a user list endpoint exists." />
-        <AdminStatCard
-          label="Products"
-          icon={PackageIcon}
-          unavailableMessage="Data unavailable until an admin product endpoint exists."
-        />
+        <AdminStatCard label="Orders" icon={ShoppingCartIcon} unavailableMessage="The API does not expose an admin order list yet." />
+        <AdminStatCard label="Users" icon={UsersIcon} value={users.data?.total ?? null} loading={users.isLoading} errorMessage={users.error ? getErrorMessage(users.error) : undefined} href="/admin/users" />
+        <AdminStatCard label="Products" icon={PackageIcon} value={products.data?.total ?? null} loading={products.isLoading} errorMessage={products.error ? getErrorMessage(products.error) : undefined} href="/admin/products" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -216,53 +180,6 @@ export function DashboardView() {
           )}
         </ActivityCard>
 
-        <ActivityCard title="Recent orders" description="Latest orders placed on the marketplace" href="/admin/orders">
-          {orders.isLoading ? (
-            <AdminListSkeleton rows={4} />
-          ) : orders.error ? (
-            <AdminError error={orders.error} onRetry={() => orders.mutate()} retrying={orders.isValidating} />
-          ) : recentOrders.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">No orders yet.</p>
-          ) : (
-            <ul className="flex flex-col">
-              {recentOrders.map((order) => (
-                <ActivityRow
-                  key={order.id}
-                  href={`/admin/orders?order=${encodeURIComponent(order.id)}`}
-                  title={orderNumber(order)}
-                  subtitle={formatDate(order.createdAt)}
-                  status={order.status}
-                />
-              ))}
-            </ul>
-          )}
-        </ActivityCard>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Orders by status</CardTitle>
-            <CardDescription>Distribution of all orders returned by the API</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {orders.isLoading ? (
-              <AdminListSkeleton rows={4} />
-            ) : orders.error ? (
-              <AdminError error={orders.error} onRetry={() => orders.mutate()} retrying={orders.isValidating} />
-            ) : statusChart.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">No order data to chart yet.</p>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-64 w-full">
-                <BarChart data={statusChart} accessibilityLayer>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="status" tickLine={false} axisLine={false} tickMargin={8} interval={0} fontSize={11} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} />
-                  <ChartTooltip content={<ChartTooltipContent hideLabel={false} />} />
-                  <Bar dataKey="count" fill="var(--color-count)" radius={6} />
-                </BarChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </>
   )

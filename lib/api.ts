@@ -9,6 +9,8 @@ import type {
   SellerApplicationDecision,
   SupportTicket,
   TicketStatus,
+  PaginatedResult,
+  AdminAuditEvent,
 } from "@/lib/admin-types"
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "")
@@ -18,6 +20,10 @@ let refreshInFlight: Promise<string | null> | null = null
 
 export function setAccessToken(token: string | null) {
   accessToken = token
+}
+
+export function getAccessToken() {
+  return accessToken
 }
 
 export class ApiError extends Error {
@@ -227,13 +233,16 @@ export function revokeOtherSessions() {
 
 /* Admin account and product management */
 
-export async function listAdminUsers() {
-  const payload = await apiRequest("/api/v1/admin/users")
-  return toList<AdminAccount>(payload, ["users", "items", "results"])
+export async function listAdminUsers({ q = "", page = 1, pageSize = 25, status = "", role = "" } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (q.trim()) params.set("q", q.trim())
+  if (status) params.set("status", status)
+  if (role) params.set("role", role)
+  return apiRequest<PaginatedResult<AdminAccount>>(`/api/v1/admin/users?${params}`)
 }
 
-export function inviteAdminAccount(input: { email: string; firstName: string; lastName: string }) {
-  return apiRequest("/api/v1/admin/users/admins", { method: "POST", body: input })
+export function getAdminUser(id: string) {
+  return apiRequest<AdminAccount>(`/api/v1/admin/users/${encodeURIComponent(id)}`)
 }
 
 export function updateAdminUserStatus(id: string, status: "ACTIVE" | "SUSPENDED") {
@@ -243,9 +252,11 @@ export function updateAdminUserStatus(id: string, status: "ACTIVE" | "SUSPENDED"
   })
 }
 
-export async function listAdminProducts() {
-  const payload = await apiRequest("/api/v1/admin/products")
-  return toList<AdminProduct>(payload, ["products", "items", "results"])
+export async function listAdminProducts({ q = "", page = 1, pageSize = 25, status = "" } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  if (q.trim()) params.set("q", q.trim())
+  if (status) params.set("status", status)
+  return apiRequest<PaginatedResult<AdminProduct>>(`/api/v1/admin/products?${params}`)
 }
 
 export function updateAdminProductStatus(id: string, status: "ACTIVE" | "PAUSED" | "ARCHIVED") {
@@ -255,11 +266,53 @@ export function updateAdminProductStatus(id: string, status: "ACTIVE" | "PAUSED"
   })
 }
 
+export function updateAdminUserRole(id: string, role: "ADMIN" | "SELLER" | "BUYER") {
+  return apiRequest(`/api/v1/admin/users/${encodeURIComponent(id)}/role`, { method: "PATCH", body: { role } })
+}
+
+export function grantAdminByEmail(email: string) {
+  return apiRequest(`/api/v1/admin/users/admins`, { method: "POST", body: { email: email.trim().toLowerCase() } })
+}
+
+export function revokeAdminAccess(id: string) {
+  return apiRequest(`/api/v1/admin/users/${encodeURIComponent(id)}/admin-access`, { method: "DELETE" })
+}
+
+export function deleteAdminUser(id: string) {
+  return apiRequest(`/api/v1/admin/users/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+
+export function listAdminUserSessions(id: string) {
+  return apiRequest<AuthSession[]>(`/api/v1/admin/users/${encodeURIComponent(id)}/sessions`)
+}
+
+export function revokeAdminUserSession(userId: string, sessionId: string) {
+  return apiRequest(`/api/v1/admin/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" })
+}
+
+export function listAdminAuditEvents(targetId?: string) {
+  const params = new URLSearchParams({ page: "1", pageSize: "100" })
+  if (targetId) params.set("targetId", targetId)
+  return apiRequest<PaginatedResult<AdminAuditEvent>>(`/api/v1/admin/audit-events?${params}`)
+}
+
+export function archiveAdminProduct(id: string) {
+  return apiRequest(`/api/v1/admin/products/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+
 /* Seller applications */
 
 export async function listSellerApplications() {
   const payload = await apiRequest("/api/v1/admin/seller-applications")
-  return toList<SellerApplication>(payload, ["applications", "sellerApplications", "items", "results"])
+  return toList<Record<string, unknown>>(payload, ["applications", "sellerApplications", "items", "results"])
+    .map((application) => ({
+      ...application,
+      status: (application.status ?? "UNDER_REVIEW") as string,
+      user: application.user as SellerApplication["user"],
+      identityDocumentId: (application.idDocumentMediaId ?? application.identityDocumentId) as string | undefined,
+      selfieId: (application.selfieMediaId ?? application.selfieId) as string | undefined,
+      ownerBirthDate: (application.ownerBirthDate ?? application.dateOfBirth) as string | undefined,
+    })) as SellerApplication[]
 }
 
 export function reviewSellerApplication(id: string, decision: SellerApplicationDecision, reviewNote?: string) {

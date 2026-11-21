@@ -29,10 +29,10 @@ const KIND_ICON = {
 }
 
 const STATUS_COPY: Record<RealtimeStatus, string> = {
-  unconfigured: "Live updates are off because no realtime server is configured.",
-  connecting: "Connecting to live updates…",
-  connected: "Live updates are on.",
-  disconnected: "Live updates are disconnected. New notifications will appear once the connection returns.",
+  unconfigured: "Admin notifications are not provided by the API yet.",
+  connecting: "Connecting to the authenticated realtime gateway…",
+  connected: "Realtime gateway connected. Admin notification events are not provided by the API yet.",
+  disconnected: "Realtime gateway disconnected. Admin notification events are not provided by the API yet.",
 }
 
 export function AdminNotificationsButton({ className }: { className?: string }) {
@@ -99,7 +99,7 @@ export function AdminNotificationsPanel() {
                 </EmptyMedia>
                 <EmptyTitle>No notifications yet</EmptyTitle>
                 <EmptyDescription>
-                  Support and order notifications pushed by the backend during this session will appear here.
+                  The backend does not currently expose admin notification events.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

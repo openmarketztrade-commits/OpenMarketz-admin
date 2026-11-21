@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AdminEmptyState } from "./admin-empty-state"
 import { AdminPageHeader } from "./admin-page-header"
 
-interface RequiredEndpoint {
+export interface RequiredEndpoint {
   name: string
   description: string
 }
