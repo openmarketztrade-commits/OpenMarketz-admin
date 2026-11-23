@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { CheckIcon, Loader2Icon, TagsIcon } from "lucide-react"
+import { CheckIcon, Loader2Icon, PencilIcon, TagsIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { AdminEmptyState } from "@/components/admin/admin-empty-state"
 import { AdminError } from "@/components/admin/admin-error"
@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useAdminCategories } from "@/lib/admin-hooks"
-import { createAdminCategory, getErrorMessage, updateAdminCategoryStatus } from "@/lib/api"
+import { createAdminCategory, getErrorMessage, updateAdminCategory, updateAdminCategoryStatus } from "@/lib/api"
 
 function slugFromName(name: string) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
@@ -30,6 +30,8 @@ export function CategoriesView() {
   const [sortOrder, setSortOrder] = useState("0")
   const [creating, setCreating] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editImageUrl, setEditImageUrl] = useState("")
 
   async function createCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -70,6 +72,26 @@ export function CategoriesView() {
       await mutate()
     } catch (cause) {
       toast.error(getErrorMessage(cause, "The category status could not be changed."))
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  function startEditing(category: NonNullable<typeof categories>[number]) {
+    setEditingId(category.id)
+    setEditImageUrl(category.imageUrl ?? "")
+  }
+
+  async function saveCategoryImage(category: NonNullable<typeof categories>[number]) {
+    if (updatingId) return
+    setUpdatingId(category.id)
+    try {
+      await updateAdminCategory(category.id, { imageUrl: editImageUrl.trim() || null })
+      toast.success(`${category.name} image URL updated.`)
+      setEditingId(null)
+      await mutate()
+    } catch (cause) {
+      toast.error(getErrorMessage(cause, "The category image URL could not be updated."))
     } finally {
       setUpdatingId(null)
     }
@@ -130,14 +152,24 @@ export function CategoriesView() {
 
     {isLoading ? <AdminTableSkeleton label="Loading categories" /> : error ? <AdminError error={error} title="Unable to load categories" onRetry={() => mutate()} retrying={isValidating} /> : categories?.length ? <div className="overflow-x-auto rounded-lg border bg-card">
       <table className="w-full text-sm">
-        <thead><tr className="border-b text-left text-muted-foreground"><th className="p-3">Category</th><th className="p-3">Slug</th><th className="p-3">Products</th><th className="p-3">Order</th><th className="p-3">Status</th><th className="p-3 text-right">Action</th></tr></thead>
+        <thead><tr className="border-b text-left text-muted-foreground"><th className="p-3">Category</th><th className="p-3">Image URL</th><th className="p-3">Slug</th><th className="p-3">Products</th><th className="p-3">Order</th><th className="p-3">Status</th><th className="p-3 text-right">Actions</th></tr></thead>
         <tbody>{categories.map((category) => <tr key={category.id} className="border-b last:border-0">
           <td className="p-3"><span className="font-medium">{category.name}</span><span className="block max-w-lg text-xs text-muted-foreground">{category.description}</span></td>
+          <td className="p-3">
+            {editingId === category.id ? <div className="flex min-w-64 items-center gap-2">
+              <Input aria-label={`${category.name} image URL`} type="url" value={editImageUrl} onChange={(event) => setEditImageUrl(event.target.value)} placeholder="https://…" />
+              <Button size="icon" aria-label="Save image URL" disabled={!!updatingId} onClick={() => void saveCategoryImage(category)}>{updatingId === category.id ? <Loader2Icon className="animate-spin" /> : <CheckIcon />}</Button>
+              <Button size="icon" variant="ghost" aria-label="Cancel editing image URL" disabled={!!updatingId} onClick={() => setEditingId(null)}><XIcon /></Button>
+            </div> : <div className="flex max-w-xs items-center gap-2">
+              <span className="truncate text-xs text-muted-foreground">{category.imageUrl || "—"}</span>
+              <Button size="icon" variant="ghost" aria-label={`Edit ${category.name} image URL`} onClick={() => startEditing(category)}><PencilIcon /></Button>
+            </div>}
+          </td>
           <td className="p-3 font-mono text-xs">{category.slug}</td>
           <td className="p-3">{category._count?.products ?? 0}</td>
           <td className="p-3">{category.sortOrder}</td>
           <td className="p-3"><AdminStatusBadge status={category.active ? "ACTIVE" : "INACTIVE"} /></td>
-          <td className="p-3 text-right"><Button size="sm" variant={category.active ? "outline" : "default"} disabled={!!updatingId} onClick={() => void toggleCategory(category)}>
+          <td className="p-3 text-right"><Button size="sm" variant={category.active ? "outline" : "default"} disabled={!!updatingId || !!editingId} onClick={() => void toggleCategory(category)}>
             {updatingId === category.id && <Loader2Icon className="animate-spin" />}
             {updatingId === category.id ? "Saving…" : category.active ? "Deactivate" : "Activate"}
           </Button></td>

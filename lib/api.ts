@@ -257,6 +257,13 @@ export function createAdminCategory(input: {
   return apiRequest<AdminCategory>("/api/v1/admin/categories", { method: "POST", body: input })
 }
 
+export function updateAdminCategory(id: string, input: { imageUrl: string | null }) {
+  return apiRequest<AdminCategory>(`/api/v1/admin/categories/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: input,
+  })
+}
+
 export function updateAdminCategoryStatus(id: string, active: boolean) {
   return apiRequest<AdminCategory>(`/api/v1/admin/categories/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
