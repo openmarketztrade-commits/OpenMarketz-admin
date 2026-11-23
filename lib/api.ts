@@ -16,10 +16,12 @@ import type {
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "")
 
 let accessToken: string | null = null
+let accessTokenVersion = 0
 let refreshInFlight: Promise<string | null> | null = null
 
 export function setAccessToken(token: string | null) {
   accessToken = token
+  accessTokenVersion += 1
 }
 
 export function getAccessToken() {
@@ -135,6 +137,7 @@ export async function apiRequest<T = unknown>(
 async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async () => {
+    const versionAtStart = accessTokenVersion
     try {
       const payload = await apiRequest<{ accessToken?: string }>("/api/v1/auth/refresh", {
         method: "POST",
@@ -144,9 +147,13 @@ async function refreshAccessToken(): Promise<string | null> {
       if (typeof token !== "string" || !token) {
         throw new ApiError("The server did not return an access token.", 502, payload)
       }
+      // A login or logout may have changed auth state while this refresh was in flight.
+      if (accessTokenVersion !== versionAtStart) return accessToken
       setAccessToken(token)
       return token
     } catch (error) {
+      // A stale refresh failure must not clear a token issued by a newer login.
+      if (accessTokenVersion !== versionAtStart) return accessToken
       setAccessToken(null)
       if (error instanceof ApiError && error.status === 401) return null
       throw error

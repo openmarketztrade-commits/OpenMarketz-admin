@@ -50,7 +50,7 @@ export function LoginForm() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Sign in</CardTitle>
-          <CardDescription>Use your OpenMarketz administrator account.</CardDescription>
+          <CardDescription>Sign in with the email address and password for your OpenMarketz administrator account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
