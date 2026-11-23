@@ -2,6 +2,7 @@ import type {
   AuthUser,
   AdminAccount,
   AdminProduct,
+  AdminCategory,
   AuthSession,
   MediaAccess,
   Order,
@@ -239,6 +240,29 @@ export function revokeOtherSessions() {
 }
 
 /* Admin account and product management */
+
+export async function listAdminCategories() {
+  const payload = await apiRequest(`/api/v1/admin/categories`)
+  return toList<AdminCategory>(payload, ["categories", "items", "results"])
+}
+
+export function createAdminCategory(input: {
+  name: string
+  slug?: string
+  description: string
+  imageUrl?: string
+  sortOrder?: number
+  active?: boolean
+}) {
+  return apiRequest<AdminCategory>("/api/v1/admin/categories", { method: "POST", body: input })
+}
+
+export function updateAdminCategoryStatus(id: string, active: boolean) {
+  return apiRequest<AdminCategory>(`/api/v1/admin/categories/${encodeURIComponent(id)}/status`, {
+    method: "PATCH",
+    body: { active },
+  })
+}
 
 export async function listAdminUsers({ q = "", page = 1, pageSize = 25, status = "", role = "" } = {}) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })

@@ -6,6 +6,7 @@ import {
   ShieldCheckIcon,
   ShoppingCartIcon,
   StoreIcon,
+  TagsIcon,
   UsersIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -41,6 +42,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { href: "/admin/users", label: "Users", icon: UsersIcon },
       { href: "/admin/admins", label: "Administrators", icon: ShieldCheckIcon },
       { href: "/admin/products", label: "Products", icon: PackageIcon },
+      { href: "/admin/categories", label: "Categories", icon: TagsIcon },
     ],
   },
   {

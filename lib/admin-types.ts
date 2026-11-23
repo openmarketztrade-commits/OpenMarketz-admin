@@ -37,6 +37,19 @@ export interface AdminProduct {
   seller?: StoreRef | null
 }
 
+export interface AdminCategory {
+  id: string
+  slug: string
+  name: string
+  description: string
+  imageUrl?: string | null
+  active: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  _count?: { products: number }
+}
+
 export interface AuthSession {
   id: string
   userAgent?: string | null

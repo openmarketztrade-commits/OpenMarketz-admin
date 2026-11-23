@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import {
   listAdminProducts,
+  listAdminCategories,
   listAdminSessions,
   getOrder,
   getSupportTicket,
@@ -21,6 +22,7 @@ export const adminKeys = {
   orders: "admin/orders",
   users: "admin/users",
   products: "admin/products",
+  categories: "admin/categories",
   sessions: "admin/sessions",
   order: (id: string) => ["admin/order", id] as const,
 }
@@ -47,6 +49,10 @@ export function useAdminUsers(params: { q?: string; page?: number; pageSize?: nu
 
 export function useAdminProducts(params: { q?: string; page?: number; pageSize?: number; status?: string } = {}) {
   return useSWR([adminKeys.products, params], ([, options]) => listAdminProducts(options))
+}
+
+export function useAdminCategories() {
+  return useSWR(adminKeys.categories, listAdminCategories)
 }
 
 export function useAdminSessions() {
