@@ -366,7 +366,7 @@ export async function getSupportTicket(id: string) {
 export function replyToSupportTicket(id: string, message: string) {
   return apiRequest(`/api/v1/support/tickets/${encodeURIComponent(id)}/replies`, {
     method: "POST",
-    body: { message: message.trim() },
+    body: { body: message.trim() },
   })
 }
 
